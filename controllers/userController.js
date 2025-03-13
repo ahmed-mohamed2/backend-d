@@ -17,6 +17,7 @@ const getUsers = asyncHandler(async (req, res) => {
 // @access  Private/Admin
 const getUserById = asyncHandler(async (req, res) => {
   const user = await User.findById(req.params.id);
+  const lang = req.lang || 'en';
 
   if (user) {
     let additionalInfo = {};
@@ -37,6 +38,8 @@ const getUserById = asyncHandler(async (req, res) => {
             rating: trainer.rating,
             totalReviews: trainer.totalReviews,
             assignedTraineesCount: trainer.assignedTrainees.length,
+            profileImage: trainer.profileImage || '',
+            vehicleImage: trainer.vehicleImage || '',
           },
         };
       }
@@ -44,11 +47,27 @@ const getUserById = asyncHandler(async (req, res) => {
       const trainee = await Trainee.findOne({user: user._id});
 
       if (trainee) {
+        const langCap = lang.charAt(0).toUpperCase() + lang.slice(1);
+
+        // Process active plans to return language-specific data
+        const activePlans = trainee.activePlans
+          ? trainee.activePlans.map(plan => {
+              if (plan.plan && plan.plan.nameEn && plan.plan.nameAr) {
+                return {
+                  ...plan.toObject(),
+                  planName: plan.plan[`name${langCap}`] || '',
+                };
+              }
+              return plan;
+            })
+          : [];
+
         additionalInfo = {
           trainee: {
             _id: trainee._id,
             assignedTrainer: trainee.assignedTrainer,
             activePlansCount: trainee.activePlans.length,
+            activePlans,
             preferredLanguage: trainee.preferredLanguage,
           },
         };
@@ -79,6 +98,7 @@ const getUserById = asyncHandler(async (req, res) => {
 // @access  Private/Admin
 const updateUser = asyncHandler(async (req, res) => {
   const user = await User.findById(req.params.id);
+  const lang = req.lang || 'en';
 
   if (user) {
     user.name = req.body.name || user.name;
@@ -102,16 +122,27 @@ const updateUser = asyncHandler(async (req, res) => {
           vehicleType: req.body.trainer.vehicleType || '',
           vehicleModel: req.body.trainer.vehicleModel || '',
           vehicleYear: req.body.trainer.vehicleYear || null,
+          profileImage: req.body.trainer.profileImage || '',
+          vehicleImage: req.body.trainer.vehicleImage || '',
         });
       } else if (trainer) {
-        const {status, hasVehicle, vehicleType, vehicleModel, vehicleYear} =
-          req.body.trainer;
+        const {
+          status,
+          hasVehicle,
+          vehicleType,
+          vehicleModel,
+          vehicleYear,
+          profileImage,
+          vehicleImage,
+        } = req.body.trainer;
 
         if (status) trainer.status = status;
         if (hasVehicle !== undefined) trainer.hasVehicle = hasVehicle;
         if (vehicleType) trainer.vehicleType = vehicleType;
         if (vehicleModel) trainer.vehicleModel = vehicleModel;
         if (vehicleYear) trainer.vehicleYear = vehicleYear;
+        if (profileImage) trainer.profileImage = profileImage;
+        if (vehicleImage) trainer.vehicleImage = vehicleImage;
 
         await trainer.save();
       }
@@ -122,7 +153,7 @@ const updateUser = asyncHandler(async (req, res) => {
         // Create trainee profile if it doesn't exist
         trainee = await Trainee.create({
           user: user._id,
-          preferredLanguage: req.body.trainee.preferredLanguage || 'en',
+          preferredLanguage: req.body.trainee.preferredLanguage || lang,
         });
       } else if (trainee) {
         const {preferredLanguage, assignedTrainer} = req.body.trainee;
@@ -178,6 +209,7 @@ const deleteUser = asyncHandler(async (req, res) => {
 // @access  Private/Admin
 const getTrainers = asyncHandler(async (req, res) => {
   const {status} = req.query;
+  const lang = req.lang || 'en'; // Get language from middleware
 
   let filterQuery = {};
   if (status) {
@@ -188,7 +220,65 @@ const getTrainers = asyncHandler(async (req, res) => {
     .populate('user', 'name email phone gender age')
     .exec();
 
+  // Format response based on language preference if needed
+  // This is a simple case as trainer data doesn't have language-specific fields
+  // But you could add formatting if needed in the future
+
   res.json(trainers);
+});
+
+// @desc    Get all trainees
+// @route   GET /api/users/trainees
+// @access  Private/Admin
+const getAllTrainees = asyncHandler(async (req, res) => {
+  const {status} = req.query;
+  const lang = req.lang || 'en'; // Get language from middleware
+  const langCap = lang.charAt(0).toUpperCase() + lang.slice(1);
+
+  let query = {};
+
+  // Additional filters can be added here similar to trainers
+
+  const trainees = await Trainee.find(query)
+    .populate('user', 'name email phone gender age')
+    .populate({
+      path: 'assignedTrainer',
+      populate: {
+        path: 'user',
+        select: 'name email phone',
+      },
+    })
+    .populate({
+      path: 'activePlans.plan',
+      select: `name${langCap} description${langCap} numberOfSessions price`,
+    })
+    .exec();
+
+  // Format response based on language
+  const formattedTrainees = trainees.map(trainee => {
+    const formattedTrainee = trainee.toObject();
+
+    // Process active plans to return language-specific data
+    if (
+      formattedTrainee.activePlans &&
+      formattedTrainee.activePlans.length > 0
+    ) {
+      formattedTrainee.activePlans = formattedTrainee.activePlans.map(plan => {
+        if (plan.plan) {
+          return {
+            ...plan,
+            planName: plan.plan[`name${langCap}`] || '',
+            planDescription: plan.plan[`description${langCap}`] || '',
+          };
+        }
+        return plan;
+      });
+    }
+
+    return formattedTrainee;
+  });
+
+  res.json(formattedTrainees);
 });
 
 // @desc    Update trainer status
@@ -224,5 +314,6 @@ module.exports = {
   updateUser,
   deleteUser,
   getTrainers,
+  getAllTrainees,
   updateTrainerStatus,
 };

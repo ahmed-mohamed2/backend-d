@@ -165,7 +165,6 @@ const importData = async () => {
     const createdUsers = await User.insertMany(hashedUsers);
 
     // Get specific users
-    const adminUser = createdUsers[0]._id;
     const trainer1 = createdUsers[1]._id;
     const trainer2 = createdUsers[2]._id;
     const trainee1 = createdUsers[3]._id;

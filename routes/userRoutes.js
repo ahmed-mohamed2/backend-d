@@ -6,6 +6,7 @@ const {
   updateUser,
   deleteUser,
   getTrainers,
+  getAllTrainees,
   updateTrainerStatus,
 } = require('../controllers/userController');
 const {protect} = require('../middleware/authMiddleware');
@@ -19,6 +20,9 @@ router.get('/', getUsers);
 
 // @route   GET /api/users/trainers
 router.get('/trainers', getTrainers);
+
+// @route   GET /api/users/trainees
+router.get('/trainees', getAllTrainees);
 
 // @route   PUT /api/users/trainers/:id/status
 router.put('/trainers/:id/status', updateTrainerStatus);

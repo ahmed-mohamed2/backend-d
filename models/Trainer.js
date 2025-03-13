@@ -82,6 +82,14 @@ const trainerSchema = mongoose.Schema(
       ],
       default: [],
     },
+    profileImage: {
+      type: String,
+      default: '',
+    },
+    vehicleImage: {
+      type: String,
+      default: '',
+    },
   },
   {
     timestamps: true,

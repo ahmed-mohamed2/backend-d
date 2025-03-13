@@ -1,8 +1,9 @@
 const asyncHandler = require('express-async-handler');
+const path = require('path');
+const fs = require('fs');
 const Trainer = require('../models/Trainer');
 const Trainee = require('../models/Trainee');
 const Session = require('../models/Session');
-const User = require('../models/User');
 const {SESSION_STATUS} = require('../config/config');
 
 // @desc    Get trainer profile
@@ -258,6 +259,83 @@ const rescheduleSession = asyncHandler(async (req, res) => {
   res.json(updatedSession);
 });
 
+// @desc    Upload trainer profile image
+// @route   POST /api/trainers/upload/profile
+// @access  Private/Trainer
+const uploadProfileImage = asyncHandler(async (req, res) => {
+  if (!req.file) {
+    res.status(400);
+    throw new Error('Please upload an image file');
+  }
+
+  const trainer = await Trainer.findOne({user: req.user._id});
+
+  if (!trainer) {
+    res.status(404);
+    throw new Error('Trainer profile not found');
+  }
+
+  // If there's an existing image, we could delete it here
+  // if (trainer.profileImage) {
+  //   const oldPath = path.join(__dirname, '..', trainer.profileImage);
+  //   if (fs.existsSync(oldPath)) {
+  //     fs.unlinkSync(oldPath);
+  //   }
+  // }
+
+  // Update trainer with new image path
+  trainer.profileImage = `/uploads/trainers/${req.file.filename}`;
+  const updatedTrainer = await trainer.save();
+
+  res.json({
+    _id: updatedTrainer._id,
+    profileImage: updatedTrainer.profileImage,
+    message: 'Profile image uploaded successfully',
+  });
+});
+
+// @desc    Upload vehicle image
+// @route   POST /api/trainers/upload/vehicle
+// @access  Private/Trainer
+const uploadVehicleImage = asyncHandler(async (req, res) => {
+  if (!req.file) {
+    res.status(400);
+    throw new Error('Please upload an image file');
+  }
+
+  const trainer = await Trainer.findOne({user: req.user._id});
+
+  if (!trainer) {
+    res.status(404);
+    throw new Error('Trainer profile not found');
+  }
+
+  if (!trainer.hasVehicle) {
+    res.status(400);
+    throw new Error(
+      'You must have a vehicle registered to upload a vehicle image',
+    );
+  }
+
+  // If there's an existing image, we could delete it here
+  // if (trainer.vehicleImage) {
+  //   const oldPath = path.join(__dirname, '..', trainer.vehicleImage);
+  //   if (fs.existsSync(oldPath)) {
+  //     fs.unlinkSync(oldPath);
+  //   }
+  // }
+
+  // Update trainer with new image path
+  trainer.vehicleImage = `/uploads/vehicles/${req.file.filename}`;
+  const updatedTrainer = await trainer.save();
+
+  res.json({
+    _id: updatedTrainer._id,
+    vehicleImage: updatedTrainer.vehicleImage,
+    message: 'Vehicle image uploaded successfully',
+  });
+});
+
 module.exports = {
   getTrainerProfile,
   getAssignedTrainees,
@@ -266,4 +344,6 @@ module.exports = {
   startSession,
   completeSession,
   rescheduleSession,
+  uploadProfileImage,
+  uploadVehicleImage,
 };
